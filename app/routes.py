@@ -1,6 +1,6 @@
 from flask import request, jsonify
 import os
-from app.models import TechnicalObject
+from app.models import TechnicalObject, Subsystem  # Import Subsystem model
 from app.utils import process_csv_data  # Import the utility function
 from app import db
 
@@ -29,6 +29,8 @@ def init_app(app):
             
             return jsonify({"message": result_message}), 201
         
+        return jsonify({"error": "Invalid file format. Please upload a CSV file."}), 400
+
     @app.route('/technical_objects', methods=['GET'])
     def get_technical_objects():
         technical_objects = TechnicalObject.query.all()
@@ -40,13 +42,35 @@ def init_app(app):
         for obj in technical_objects:
             result.append({
                 "id": obj.id,
-                "name": obj.name,
-                "serial_number": obj.serial_number,
+                "aircraft_make": obj.name, 
+                "control_number": obj.control_number,
                 "status": obj.status,
-                "last_maintenance_date": obj.last_maintenance_date,
+                "difficulty_date": obj.last_maintenance_date, 
                 "next_maintenance_due": obj.next_maintenance_due,
                 "current_oem_revision": obj.current_oem_revision,
                 "revision_compliance_status": obj.revision_compliance_status
+            })
+
+        return jsonify(result), 200
+
+    @app.route('/subsystems', methods=['GET'])
+    def get_subsystems():
+        subsystems = Subsystem.query.all()
+
+        if not subsystems:
+            return jsonify([]), 200
+
+        result = []
+        for subsystem in subsystems:
+            result.append({
+                "id": subsystem.id,
+                "name": subsystem.name,
+                "status": subsystem.status,
+                "part_number": subsystem.part_number,
+                "location": subsystem.location,
+                "repair_classification": subsystem.repair_classification,
+                "repair_vendor": subsystem.repair_vendor,
+                "technical_object_id": subsystem.technical_object_id
             })
 
         return jsonify(result), 200
