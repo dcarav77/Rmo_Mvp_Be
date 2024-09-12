@@ -4,7 +4,7 @@ class TechnicalObject(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
     type = db.Column(db.String(255))  # Type of object (e.g., Aircraft Engine, Component)
-    serial_number = db.Column(db.String(255), unique=True)  # Unique identifier for the object
+    control_number = db.Column(db.String(255), unique=True)  # Unique identifier for the object
     status = db.Column(db.String(50))  # Status of the object (e.g., Active, Inactive, Under Maintenance)
     
     # Maintenance Data
@@ -23,7 +23,7 @@ class TechnicalObject(db.Model):
             'id': self.id,
             'name': self.name,
             'type': self.type,
-            'serial_number': self.serial_number,
+            'control_number': self.control_number, 
             'status': self.status,
             'last_maintenance_date': self.last_maintenance_date.isoformat() if self.last_maintenance_date else None,
             'next_maintenance_due': self.next_maintenance_due.isoformat() if self.next_maintenance_due else None,
