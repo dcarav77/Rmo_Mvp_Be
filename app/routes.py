@@ -42,13 +42,14 @@ def init_app(app):
         for obj in technical_objects:
             result.append({
                 "id": obj.id,
-                "aircraft_make": obj.name, 
+                "name": obj.name,
+                "type": obj.type,
                 "control_number": obj.control_number,
-                "status": obj.status,
-                "difficulty_date": obj.last_maintenance_date, 
                 "next_maintenance_due": obj.next_maintenance_due,
-                "current_oem_revision": obj.current_oem_revision,
-                "revision_compliance_status": obj.revision_compliance_status
+                "revision_compliance_status": obj.revision_compliance_status,
+                "aircraft_make": obj.aircraft_make,
+                "aircraft_model": obj.aircraft_model,
+                "difficulty_date": obj.difficulty_date 
             })
 
         return jsonify(result), 200

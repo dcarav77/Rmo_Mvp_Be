@@ -5,15 +5,19 @@ class TechnicalObject(db.Model):
     name = db.Column(db.String(255), nullable=False)
     type = db.Column(db.String(255))  # Type of object (e.g., Aircraft Engine, Component)
     control_number = db.Column(db.String(255), unique=True)  # Unique identifier for the object
-    status = db.Column(db.String(50))  # Status of the object (e.g., Active, Inactive, Under Maintenance)
+    #status = db.Column(db.String(50))  # Status of the object (e.g., Active, Inactive, Under Maintenance)
+
+    #  Aircraft Make and Model
+    aircraft_make = db.Column(db.String(255))  
+    aircraft_model = db.Column(db.String(255))  
     
     # Maintenance Data
-    last_maintenance_date = db.Column(db.Date)  # Last date when maintenance was performed
-    next_maintenance_due = db.Column(db.Date)  # Date when the next maintenance is due
+    next_maintenance_due = db.Column(db.Date)  
     
     # OEM Compliance
-    current_oem_revision = db.Column(db.String(255))  # Current OEM revision applicable to the object
+    #current_oem_revision = db.Column(db.String(255))  # Current OEM revision applicable to the object
     revision_compliance_status = db.Column(db.String(50))  # Compliance status with the OEM revision (e.g., Compliant, Non-compliant)
+    difficulty_date = db.Column(db.Date) 
     
     # Relationships for Subsystems
     subsystems = db.relationship('Subsystem', back_populates='technical_object', cascade='all, delete-orphan')  # Subsystems that belong to this technical object
@@ -25,7 +29,8 @@ class TechnicalObject(db.Model):
             'type': self.type,
             'control_number': self.control_number, 
             'status': self.status,
-            'last_maintenance_date': self.last_maintenance_date.isoformat() if self.last_maintenance_date else None,
+            'aircraft_make': self.aircraft_make,
+            'aircraft_model': self.aircraft_model,
             'next_maintenance_due': self.next_maintenance_due.isoformat() if self.next_maintenance_due else None,
             'current_oem_revision': self.current_oem_revision,
             'revision_compliance_status': self.revision_compliance_status,

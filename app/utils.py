@@ -4,116 +4,129 @@ from app import db
 from app.models import TechnicalObject, Subsystem
 from sqlalchemy.exc import SQLAlchemyError
 
-print("Script has started successfully")
-
 def convert_date_format(date_str):
-    """Converts dates in 'MM/DD/YY' or 'MM/DD/YYYY' format to 'YYYY-MM-DD' format."""
+    """Converts dates in 'MM/DD/YY' or 'MM/DD/YYYY' format to a datetime.date object."""
     if pd.isna(date_str) or not isinstance(date_str, str):
         return None
+    date_str = date_str.strip()  # Strip leading and trailing whitespace
     try:
-        return datetime.strptime(date_str, '%m/%d/%y').strftime('%Y-%m-%d')
+        # Try MM/DD/YY format
+        return datetime.strptime(date_str, '%m/%d/%y').date()
     except ValueError:
         try:
-            return datetime.strptime(date_str, '%m/%d/%Y').strftime('%Y-%m-%d')
+            # Try MM/DD/YYYY format
+            return datetime.strptime(date_str, '%m/%d/%Y').date()
         except ValueError:
+            print(f"Unrecognized date format: {date_str}")
             return None
 
-def process_csv_data(csv_path):
-    """Reads the CSV file, processes the data, and inserts it into the database."""
-    
-    # Disable automatic date parsing in pandas
-    df = pd.read_csv(csv_path, dtype=str)
+def handle_null(value, default=None):
+    """Returns default if the value is NaN or an empty string, otherwise returns the value."""
+    return default if pd.isna(value) or value == "" else value
 
-    # Print the first few rows of the CSV to verify data
-    print("First few rows of the CSV:")
-    print(df.head())  # Ensure the CSV is being read correctly
+def process_csv_data(csv_path):
+    """Reads the CSV file, processes the data, and inserts or updates it in the database."""
+    try:
+        # Read CSV, disabling automatic date parsing in pandas
+        df = pd.read_csv(csv_path, dtype=str)
+    except Exception as e:
+        print(f"Error reading CSV file: {e}")
+        return "Failed to read CSV"
 
     # Clean the headers: convert to lowercase, replace spaces, and remove non-alphanumeric characters
     df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_').str.replace('[^a-z0-9_]+', '', regex=True)
 
-    # Print the cleaned headers to ensure they are correct
-    print("Cleaned CSV Headers:", df.columns)
-
+    # Loop through each row
     for index, row in df.iterrows():
-        # Use lowercase 'control_number' now that headers are normalized
-        control_number = row.get('control_number', None)
+        control_number = handle_null(row.get('control_number'))
+        aircraft_make = handle_null(row.get('aircraft_make'))
+        aircraft_model = handle_null(row.get('aircraft_model'))
+        engine_make = handle_null(row.get('engine_make'))
+        part_name = handle_null(row.get('part_name'))
+        part_condition = handle_null(row.get('part_condition'))
+        engine_model = handle_null(row.get('engine_model'))
+        part_number = handle_null(row.get('part_number'), 'UNKNOWN')  # Provide a default value if missing
+        part_location = handle_null(row.get('part_location'))
+        difficulty_date = convert_date_format(row.get('difficulty_date'))
 
-        # Debugging: Print control number and difficulty date
-        difficulty_date = convert_date_format(row.get('difficulty_date', None))
-        print(f"Control Number: {control_number}, Difficulty Date: {difficulty_date}")
+        # Log missing fields
+        if not control_number:
+            print(f"Skipping row with missing control number at index {index}.")
+            continue  # Skip rows with missing control numbers
 
-        # Ensure control number is valid
-        if not control_number or '/' in control_number:
-            print(f"Skipping invalid control number: {control_number}")
-            continue  # Skip rows with invalid or missing control numbers
-
-        # Use the get method to retrieve values and handle missing data
-        aircraft_make = row.get('aircraft_make', 'Unknown Aircraft')
-        engine_make = row.get('engine_make', 'Unknown Engine Make')
-        part_name = row.get('part_name', 'Unknown Part')
-        part_condition = row.get('part_condition', 'Unknown Condition')
-        aircraft_model = row.get('aircraft_model', 'Unknown Model')
-        engine_model = row.get('engine_model', 'Unknown Engine Model')
-        part_number = row.get('part_number', 'DEFAULT_PART_NUMBER')  # Provide a default value if missing
-        part_location = row.get('part_location', 'Unknown Location')
+        if difficulty_date is None:
+            print(f"Missing or invalid difficulty date for control number {control_number}")
+        else:
+            print(f"Parsed difficulty date: {difficulty_date}")
 
         # Check if the TechnicalObject already exists
         existing_object = TechnicalObject.query.filter_by(control_number=control_number).first()
 
         if not existing_object:
-            # Create a new TechnicalObject entry
+            print(f"Inserting new TechnicalObject: control_number={control_number}, difficulty_date={difficulty_date}, aircraft_make={aircraft_make}, aircraft_model={aircraft_model}")
             new_object = TechnicalObject(
-                name=aircraft_make,
+                name=aircraft_make or 'Unknown Aircraft',
                 type="Aircraft",
                 control_number=control_number,
-                status="Active",
-                last_maintenance_date=difficulty_date,  # Map difficulty_date to last_maintenance_date
-                current_oem_revision="REV-2024-01"
+                aircraft_make=aircraft_make,
+                aircraft_model=aircraft_model,
+                difficulty_date=difficulty_date  # Make sure the parsed date is assigned here
             )
             try:
                 db.session.add(new_object)
-                db.session.commit()  # Commit to get the new_object ID
-                print(f"Inserted new TechnicalObject with control_number: {control_number}")
+                db.session.commit()
+                print(f"Inserted: control_number={control_number}, difficulty_date={new_object.difficulty_date}")
 
-                # Now, create the Subsystem entry, with the default part_number if necessary
+                # Create the Subsystem entry
                 new_subsystem = Subsystem(
-                    name=part_name,
-                    status=part_condition,
-                    part_number=part_number,  # Use the default value if part_number was missing
-                    location=part_location,
+                    name=part_name or 'Unknown Part',
+                    status=part_condition or 'Unknown Condition',
+                    part_number=part_number,
+                    location=part_location or 'Unknown Location',
                     technical_object_id=new_object.id
                 )
                 db.session.add(new_subsystem)
                 db.session.commit()
-                print(f"Inserted new Subsystem for control_number: {control_number}")
+                print(f"Inserted Subsystem for: control_number={control_number}")
 
             except SQLAlchemyError as e:
-                db.session.rollback()  # Rollback in case of error
-                print(f"Error inserting TechnicalObject or Subsystem: {e}")
+                db.session.rollback()
+                print(f"Error inserting TechnicalObject or Subsystem for control_number={control_number}: {e}")
 
         else:
-            print(f"TechnicalObject with control_number {control_number} already exists")
+            # If the object already exists, ensure fields like difficulty_date and aircraft_model are updated if they are missing
+            print(f"Updating existing TechnicalObject: control_number={control_number}")
+            if not existing_object.difficulty_date and difficulty_date:
+                existing_object.difficulty_date = difficulty_date  # Update difficulty date if not set
+                print(f"Updated difficulty_date for control_number={control_number}: {difficulty_date}")
 
-            # Optionally, update existing TechnicalObject or add new Subsystems if part_number is valid
+            if not existing_object.aircraft_model and aircraft_model:
+                existing_object.aircraft_model = aircraft_model  # Update aircraft_model if not set
+                print(f"Updated aircraft_model for control_number={control_number}: {aircraft_model}")
+
             try:
+                db.session.commit()  # Commit any updates made to the existing object
+
+                # Optionally, add new Subsystems for existing TechnicalObject
                 new_subsystem = Subsystem(
-                    name=part_name,
-                    status=part_condition,
-                    part_number=part_number,  # Use the default value if part_number was missing
-                    location=part_location,
+                    name=part_name or 'Unknown Part',
+                    status=part_condition or 'Unknown Condition',
+                    part_number=part_number,
+                    location=part_location or 'Unknown Location',
                     technical_object_id=existing_object.id
                 )
                 db.session.add(new_subsystem)
                 db.session.commit()
-                print(f"Inserted new Subsystem for existing control_number: {control_number}")
+                print(f"Inserted Subsystem for existing control_number={control_number}")
             except SQLAlchemyError as e:
                 db.session.rollback()
-                print(f"Error inserting Subsystem for existing control_number {control_number}: {e}")
-    
+                print(f"Error updating TechnicalObject or inserting Subsystem for control_number={control_number}: {e}")
+
     db.session.commit()  # Final commit after all iterations
     return "Data processed and inserted into the database."
 
 
 # Example of calling the function
 csv_path = "/Users/dustin_caravaglia/Documents/repo/Rmo_Mvp_Be/blah.csv"
-process_csv_data(csv_path)
+result = process_csv_data(csv_path)
+print(result)
