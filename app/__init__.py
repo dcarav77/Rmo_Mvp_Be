@@ -1,3 +1,4 @@
+# app/__init__.py
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -12,11 +13,10 @@ def create_app():
 
     db.init_app(app)
     migrate.init_app(app, db)
-    CORS(app) 
+    CORS(app)
 
-    # Only import routes after app is fully initialized
+    # Import routes after app initialization
     with app.app_context():
-        from app.routes import init_app
-        init_app(app)
+        from app import routes
 
     return app

@@ -5,20 +5,22 @@ from app.models import TechnicalObject, Subsystem
 from sqlalchemy.exc import SQLAlchemyError
 
 def convert_date_format(date_str):
-    """Converts dates in 'MM/DD/YY' or 'MM/DD/YYYY' format to a datetime.date object."""
+    """Converts dates in various formats to a datetime.date object."""
     if pd.isna(date_str) or not isinstance(date_str, str):
         return None
     date_str = date_str.strip()  # Strip leading and trailing whitespace
-    try:
-        # Try MM/DD/YY format
-        return datetime.strptime(date_str, '%m/%d/%y').date()
-    except ValueError:
+    # List of possible date formats
+    date_formats = ['%m/%d/%y', '%m/%d/%Y', '%Y-%m-%d']
+    for fmt in date_formats:
         try:
-            # Try MM/DD/YYYY format
-            return datetime.strptime(date_str, '%m/%d/%Y').date()
+            return datetime.strptime(date_str, fmt).date()
         except ValueError:
-            print(f"Unrecognized date format: {date_str}")
-            return None
+            continue  # Try the next format
+    return None
+
+def is_date_format(value):
+    """Checks if the value is in a recognized date format (e.g., MM/DD/YYYY)."""
+    return convert_date_format(value) is not None
 
 def handle_null(value, default=None):
     """Returns default if the value is NaN or an empty string, otherwise returns the value."""
@@ -27,8 +29,8 @@ def handle_null(value, default=None):
 def process_csv_data(csv_path):
     """Reads the CSV file, processes the data, and inserts or updates it in the database."""
     try:
-        # Read CSV, disabling automatic date parsing in pandas
-        df = pd.read_csv(csv_path, dtype=str)
+        # Read CSV, disabling automatic date parsing in pandas and specifying control_number as string
+        df = pd.read_csv(csv_path, dtype=str, keep_default_na=False)
     except Exception as e:
         print(f"Error reading CSV file: {e}")
         return "Failed to read CSV"
@@ -39,6 +41,19 @@ def process_csv_data(csv_path):
     # Loop through each row
     for index, row in df.iterrows():
         control_number = handle_null(row.get('control_number'))
+        difficulty_date = convert_date_format(handle_null(row.get('difficulty_date')))
+
+        # If control_number is in date format, move it to difficulty_date
+        if is_date_format(control_number):
+            print(f"Control number is a date at index {index}: {control_number}")
+            difficulty_date = convert_date_format(control_number)
+            control_number = None  # We set it to None to skip inserting it as a control number
+
+        # Skip rows if both control_number and difficulty_date are None
+        if not control_number and not difficulty_date:
+            print(f"Skipping row with missing control number and difficulty date at index {index}.")
+            continue  # Skip rows with missing or invalid control numbers and difficulty dates
+
         aircraft_make = handle_null(row.get('aircraft_make'))
         aircraft_model = handle_null(row.get('aircraft_model'))
         engine_make = handle_null(row.get('engine_make'))
@@ -47,17 +62,6 @@ def process_csv_data(csv_path):
         engine_model = handle_null(row.get('engine_model'))
         part_number = handle_null(row.get('part_number'), 'UNKNOWN')  # Provide a default value if missing
         part_location = handle_null(row.get('part_location'))
-        difficulty_date = convert_date_format(row.get('difficulty_date'))
-
-        # Log missing fields
-        if not control_number:
-            print(f"Skipping row with missing control number at index {index}.")
-            continue  # Skip rows with missing control numbers
-
-        if difficulty_date is None:
-            print(f"Missing or invalid difficulty date for control number {control_number}")
-        else:
-            print(f"Parsed difficulty date: {difficulty_date}")
 
         # Check if the TechnicalObject already exists
         existing_object = TechnicalObject.query.filter_by(control_number=control_number).first()
@@ -65,12 +69,11 @@ def process_csv_data(csv_path):
         if not existing_object:
             print(f"Inserting new TechnicalObject: control_number={control_number}, difficulty_date={difficulty_date}, aircraft_make={aircraft_make}, aircraft_model={aircraft_model}")
             new_object = TechnicalObject(
-                name=aircraft_make or 'Unknown Aircraft',
                 type="Aircraft",
                 control_number=control_number,
                 aircraft_make=aircraft_make,
                 aircraft_model=aircraft_model,
-                difficulty_date=difficulty_date  # Make sure the parsed date is assigned here
+                difficulty_date=difficulty_date  
             )
             try:
                 db.session.add(new_object)
@@ -79,8 +82,8 @@ def process_csv_data(csv_path):
 
                 # Create the Subsystem entry
                 new_subsystem = Subsystem(
-                    name=part_name or 'Unknown Part',
-                    status=part_condition or 'Unknown Condition',
+                    part_name=part_name or 'Unknown Part',
+                    part_condition=part_condition or 'Unknown Condition',
                     part_number=part_number,
                     location=part_location or 'Unknown Location',
                     technical_object_id=new_object.id
@@ -99,6 +102,9 @@ def process_csv_data(csv_path):
             if not existing_object.difficulty_date and difficulty_date:
                 existing_object.difficulty_date = difficulty_date  # Update difficulty date if not set
                 print(f"Updated difficulty_date for control_number={control_number}: {difficulty_date}")
+            
+            if not existing_object.aircraft_make and aircraft_make:
+                existing_object.aircraft_make = aircraft_make
 
             if not existing_object.aircraft_model and aircraft_model:
                 existing_object.aircraft_model = aircraft_model  # Update aircraft_model if not set
@@ -109,10 +115,10 @@ def process_csv_data(csv_path):
 
                 # Optionally, add new Subsystems for existing TechnicalObject
                 new_subsystem = Subsystem(
-                    name=part_name or 'Unknown Part',
-                    status=part_condition or 'Unknown Condition',
+                    part_name=part_name or 'Unknown Part',
+                    part_condition=part_condition or 'Unknown Condition',
                     part_number=part_number,
-                    location=part_location or 'Unknown Location',
+                    part_location=part_location or 'Unknown Location',
                     technical_object_id=existing_object.id
                 )
                 db.session.add(new_subsystem)
@@ -125,8 +131,7 @@ def process_csv_data(csv_path):
     db.session.commit()  # Final commit after all iterations
     return "Data processed and inserted into the database."
 
-
-# Example of calling the function
-csv_path = "/Users/dustin_caravaglia/Documents/repo/Rmo_Mvp_Be/blah.csv"
-result = process_csv_data(csv_path)
-print(result)
+# Example of calling the function with the new path
+# csv_path = "/Users/dustin_caravaglia/Documents/repo/Rmo_Mvp_Be/faa_manuals/blah.csv"
+# result = process_csv_data(csv_path)
+# print(result)

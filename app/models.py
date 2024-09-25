@@ -2,22 +2,13 @@ from app import db
 
 class TechnicalObject(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False)
-    type = db.Column(db.String(255))  # Type of object (e.g., Aircraft Engine, Component)
-    control_number = db.Column(db.String(255), unique=True)  # Unique identifier for the object
-    #status = db.Column(db.String(50))  # Status of the object (e.g., Active, Inactive, Under Maintenance)
-
-    #  Aircraft Make and Model
-    aircraft_make = db.Column(db.String(255))  
-    aircraft_model = db.Column(db.String(255))  
-    
-    # Maintenance Data
-    next_maintenance_due = db.Column(db.Date)  
-    
-    # OEM Compliance
-    #current_oem_revision = db.Column(db.String(255))  # Current OEM revision applicable to the object
-    revision_compliance_status = db.Column(db.String(50))  # Compliance status with the OEM revision (e.g., Compliant, Non-compliant)
-    difficulty_date = db.Column(db.Date) 
+    aircraft_make = db.Column(db.String(255), nullable=True)  # Re-added aircraft_make
+    aircraft_model = db.Column(db.String(255), nullable=True)  # Re-added aircraft_model
+    type = db.Column(db.String(255), nullable=True)
+    next_maintenance_due = db.Column(db.Date, nullable=True)
+    revision_compliance_status = db.Column(db.String(50), nullable=True)
+    control_number = db.Column(db.String(255), unique=True, nullable=True)
+    difficulty_date = db.Column(db.Date, nullable=True)
     
     # Relationships for Subsystems
     subsystems = db.relationship('Subsystem', back_populates='technical_object', cascade='all, delete-orphan')  # Subsystems that belong to this technical object
@@ -25,7 +16,6 @@ class TechnicalObject(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
-            'name': self.name,
             'type': self.type,
             'control_number': self.control_number, 
             'status': self.status,
@@ -40,10 +30,10 @@ class TechnicalObject(db.Model):
 # Subsystem Model
 class Subsystem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False)  # e.g., Fan Module, Core Assembly
-    status = db.Column(db.String(50))  # e.g., Removed, In Use, Under Repair
+    part_name = db.Column(db.String(255), nullable=False) 
+    part_condition = db.Column(db.String(50))
     part_number = db.Column(db.String(255), nullable=False)  # Part number or identifier for the subsystem
-    location = db.Column(db.String(255))  # Where the subsystem is located (e.g., shop, external vendor)
+    part_location = db.Column(db.String(255))
     repair_classification = db.Column(db.String(50))  # Repair type (e.g., Internal, External)
     repair_vendor = db.Column(db.String(255))  # External repair vendor (if applicable)
     
@@ -54,10 +44,10 @@ class Subsystem(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
-            'name': self.name,
-            'status': self.status,
+            'part_name': self.part_name, 
+            'part_condition': self.part_condition,
             'part_number': self.part_number,
-            'location': self.location,
+            'part_location': self.part_location,
             'repair_classification': self.repair_classification,
             'repair_vendor': self.repair_vendor
         }
