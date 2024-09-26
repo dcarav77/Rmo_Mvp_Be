@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
 from arango import ArangoClient
+from flask_cors import CORS
 
 # Initialize the Flask app
 app = Flask(__name__)
+CORS(app)
 
 # Connect to ArangoDB
 client = ArangoClient(hosts='https://2848c95cbeb4.arangodb.cloud:8529')
@@ -13,8 +15,12 @@ def home():
     return jsonify({"message": "Welcome to the Flask API!"})
 
 # Add or update a part in ArangoDB
-@app.route('/parts', methods=['POST', 'PUT'])
+@app.route('/parts', methods=['GET', 'POST', 'PUT'])
 def upsert_part():
+    if request.method == 'GET':
+        parts = db_arango.collection('Part').all()
+        return jsonify([part for part in parts]), 200
+    
     data = request.json
     part_collection = db_arango.collection('Part')
 
@@ -39,8 +45,12 @@ def upsert_part():
             return jsonify({'error': 'Part not found'}), 404
 
 # Add or update an aircraft in ArangoDB
-@app.route('/aircraft', methods=['POST', 'PUT'])
+@app.route('/aircraft', methods=['GET', 'POST', 'PUT'])
 def upsert_aircraft():
+    if request.method == 'GET':
+        aircrafts = db_arango.collection('Aircraft').all()
+        return jsonify([aircraft for aircraft in aircrafts]), 200
+    
     data = request.json
     aircraft_collection = db_arango.collection('Aircraft')
 
@@ -65,8 +75,12 @@ def upsert_aircraft():
             return jsonify({'error': 'Aircraft not found'}), 404
 
 # Add or update a technician in ArangoDB
-@app.route('/technician', methods=['POST', 'PUT'])
+@app.route('/technician', methods=['GET', 'POST', 'PUT'])
 def upsert_technician():
+    if request.method == 'GET':
+        technicians = db_arango.collection('Technician').all()
+        return jsonify([tech for tech in technicians]), 200
+    
     data = request.json
     technician_collection = db_arango.collection('Technician')
 
@@ -91,8 +105,12 @@ def upsert_technician():
             return jsonify({'error': 'Technician not found'}), 404
 
 # Add or update a maintenance event in ArangoDB
-@app.route('/maintenance_event', methods=['POST', 'PUT'])
+@app.route('/maintenance_event', methods=['GET', 'POST', 'PUT'])
 def upsert_maintenance_event():
+    if request.method == 'GET':
+        maintenance_events = db_arango.collection('MaintenanceEvent').all()
+        return jsonify([event for event in maintenance_events]), 200
+    
     data = request.json
     maintenance_event_collection = db_arango.collection('MaintenanceEvent')
 
@@ -117,8 +135,12 @@ def upsert_maintenance_event():
             return jsonify({'error': 'Maintenance event not found'}), 404
 
 # Add or update a schedule in ArangoDB
-@app.route('/schedule', methods=['POST', 'PUT'])
+@app.route('/schedule', methods=['GET', 'POST', 'PUT'])
 def upsert_schedule():
+    if request.method == 'GET':
+        schedules = db_arango.collection('Schedule').all()
+        return jsonify([schedule for schedule in schedules]), 200
+
     data = request.json
     schedule_collection = db_arango.collection('Schedule')
 
@@ -144,6 +166,7 @@ def upsert_schedule():
         else:
             return jsonify({'error': 'Schedule not found'}), 404
 
+# Trigger maintenance event based on flight hours
 @app.route('/trigger_maintenance', methods=['GET'])
 def trigger_maintenance():
     aircrafts = db_arango.collection('Aircraft').all() 
@@ -161,7 +184,6 @@ def create_maintenance_event_for_aircraft(aircraft_id):
         'description': 'Scheduled maintenance due to flight hours',
         'status': 'Scheduled'
     })
-       
 
 if __name__ == '__main__':
     app.run(debug=True)
