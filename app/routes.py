@@ -14,7 +14,7 @@ db_arango = client.db('Animals', username='root', password='X4BwfpN64GSWGEk3Iphv
 def home():
     return jsonify({"message": "Welcome to the Flask API!"})
 
-# Add or update a part in ArangoDB
+#Add or update a part in ArangoDB
 @app.route('/parts', methods=['GET', 'POST', 'PUT'])
 def upsert_part():
     if request.method == 'GET':
