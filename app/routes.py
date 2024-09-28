@@ -4,7 +4,7 @@ from flask_cors import CORS
 
 # Initialize the Flask app
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 
 # Connect to ArangoDB
 client = ArangoClient(hosts='https://2848c95cbeb4.arangodb.cloud:8529')
@@ -184,6 +184,39 @@ def create_maintenance_event_for_aircraft(aircraft_id):
         'description': 'Scheduled maintenance due to flight hours',
         'status': 'Scheduled'
     })
+
+@app.route('/relationships', methods=['GET'])
+def get_relationships():
+    try:
+        # Fetch all edges from the specified collections
+        requires_maintenance_edges = db_arango.collection('requires_maintenance').all()
+        assigned_to_edges = db_arango.collection('assigned_to').all()
+        tracks_edges = db_arango.collection('tracks').all()
+
+        # Combine all edges into a single list and extract `source` and `target`
+        relationships = [
+            *requires_maintenance_edges,
+            *assigned_to_edges,
+            *tracks_edges
+        ]
+
+        # Convert relationships into the format required by your front-end
+        formatted_relationships = []
+        for edge in relationships:
+            formatted_relationships.append({
+                "id": edge["_key"],  # Unique edge ID
+                "source": edge["_from"].split('/')[1],  # Extract source node ID from _from field
+                "target": edge["_to"].split('/')[1],  # Extract target node ID from _to field
+                "label": edge.get("type", "")  # Use "type" or another field for the label if needed
+            })
+
+        # Return the formatted relationships as JSON
+        return jsonify(formatted_relationships), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
